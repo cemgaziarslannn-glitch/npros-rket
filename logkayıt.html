@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Log Paneli</title>
+
+<!-- Firebase -->
+<!-- Firebase Auth SDK ekle -->
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<!-- FONT -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui;
+  background:radial-gradient(circle at top,#0f172a,#020617);
+  color:#e5e7eb;
+}
+header{
+  padding:24px;
+  text-align:center;
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:.5px;
+}
+.filters{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;
+  padding:0 24px 20px;
+}
+.filters input,.filters select{
+  padding:10px 12px;
+  border-radius:10px;
+  border:none;
+  background:#0b1220;
+  color:#fff;
+  outline:none;
+}
+.filters input::placeholder{color:#94a3b8}
+
+.container{
+  padding:0 24px 40px;
+  display:grid;
+  gap:14px;
+}
+
+.log-card{
+  background:linear-gradient(180deg,#0b1220,#020617);
+  border-radius:18px;
+  padding:16px 18px;
+  box-shadow:0 20px 40px rgba(0,0,0,.4);
+  border:1px solid rgba(255,255,255,.05);
+}
+
+.log-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.badge{
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+}
+.badge.proje{background:#22c55e;color:#022c22}
+.badge.personel{background:#38bdf8;color:#022b40}
+.badge.transfer{background:#f97316;color:#351500}
+
+.action{
+  font-weight:700;
+  font-size:15px;
+}
+.action.create{color:#22c55e}
+.action.add{color:#22c55e}
+.action.update{color:#facc15}
+.action.delete,.action.remove{color:#ef4444}
+.action.update-location{color:#a855f7}
+.action.transfer{color:#f97316}
+
+.meta{
+  font-size:13px;
+  color:#94a3b8;
+  margin-top:6px;
+}
+
+.target{
+  margin-top:10px;
+  font-size:16px;
+  font-weight:600;
+}
+
+.details{
+  margin-top:10px;
+  background:#020617;
+  border-radius:12px;
+  padding:12px;
+  font-size:13px;
+  color:#cbd5f5;
+  display:none;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+
+.toggle{
+  margin-top:10px;
+  cursor:pointer;
+  font-size:13px;
+  color:#38bdf8;
+}
+
+.map a{
+  color:#22c55e;
+  text-decoration:none;
+  font-weight:600;
+}
+.empty{
+  text-align:center;
+  padding:60px;
+  color:#64748b;
+  font-size:18px;
+}
+</style>
+</head>
+<body>
+
+<header>🛡️ Admin Log Kayıt Paneli</header>
+
+<div class="filters">
+  <select id="typeFilter">
+    <option value="">Tür (Tümü)</option>
+    <option value="projects">Proje</option>
+    <option value="personnel">Personel</option>
+    <option value="transfer">Personel Transferi</option>
+  </select>
+
+  <select id="actionFilter">
+    <option value="">İşlem (Tümü)</option>
+    <option value="create">Proje Oluşturuldu</option>
+    <option value="add">Personel Eklendi</option>
+    <option value="update">Güncellendi</option>
+    <option value="update-location">Konum Güncellendi</option>
+    <option value="delete">Proje Silindi</option>
+    <option value="remove">Personel Silindi</option>
+    <option value="transfer">Personel Transfer Edildi</option>
+  </select>
+
+  <input id="userFilter" placeholder="Kullanıcı e-posta veya isim">
+  <input id="searchFilter" placeholder="Proje / Personel / TC">
+  <input type="date" id="startDate">
+  <input type="date" id="endDate">
+</div>
+
+<div class="container" id="logContainer"></div>
+
+<script>
+const app = firebase.initializeApp({
+  apiKey: "AIzaSyACEapdJC_e5jlRbq8M09vl-iKlvmf5kh0",
+  authDomain: "logkayit-50d87.firebaseapp.com",
+  databaseURL: "https://logkayit-50d87-default-rtdb.firebaseio.com",
+  projectId: "logkayit-50d87"
+},"logApp");
+
+const db = app.database();
+const container = document.getElementById("logContainer");
+
+let allLogs=[];
+
+/* 🔥 SAYFA AÇILINCA: SADECE EN SON GÜN VE TRANSFERLER */
+db.ref("logs").once("value", snap => {
+  let maxTs = 0;
+  snap.forEach(t => t.forEach(l => {
+    if (l.val().timestamp > maxTs) maxTs = l.val().timestamp;
+  }));
+
+  if(!maxTs){
+    container.innerHTML = '<div class="empty">Log bulunamadı</div>';
+    return;
+  }
+
+  const d = new Date(maxTs);
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const end = start + 86400000 - 1;
+
+  // Normal loglar
+  snap.forEach(typeSnap => {
+    typeSnap.forEach(l => {
+      const log = l.val();
+      if(log.timestamp >= start && log.timestamp <= end){
+        log.type = typeSnap.key;
+        allLogs.push(log);
+      }
+    });
+  });
+
+// 🟣 Personel Transferleri
+db.ref("projectTransfers").once("value", transferSnap => {
+  transferSnap.forEach(t => {
+    const tr = t.val();
+    
+    // Tarihi DD.MM.YYYY -> YYYY-MM-DD formatına çevir
+    const parts = tr.date.split("."); // ["20","01","2026"]
+    if(parts.length !== 3) return; // yanlış format varsa atla
+
+    const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // "2026-01-20"
+    const ts = new Date(`${isoDate}T${tr.time}`).getTime(); // "2026-01-20T21:25:26"
+
+    if(isNaN(ts)) return; // geçersiz tarih varsa atla
+
+    // Gün sınırları
+    if(ts >= start && ts <= end){
+      allLogs.push({
+        type: "transfer",
+        action: "transfer",
+        user: tr.performedByName,
+        details: {
+          oldProjectName: tr.oldProjectName,
+          newProjectName: tr.newProjectName,
+          personName: tr.personName,
+          personTcNo: tr.personTcNo
+        },
+        timestamp: ts
+      });
+    }
+  });
+
+    // Zaman sırasına göre sırala ve render et
+    allLogs.sort((a,b)=>b.timestamp - a.timestamp);
+    render();
+  });
+});
+
+function render(){
+  container.innerHTML="";
+  const tf=typeFilter.value;
+  const af=actionFilter.value;
+  const uf=userFilter.value.toLowerCase();
+  const sf=searchFilter.value.toLowerCase();
+  const sd=startDate.value?new Date(startDate.value).getTime():null;
+  const ed=endDate.value?new Date(endDate.value).getTime()+86400000-1:null;
+
+  let shown=0;
+
+  allLogs.forEach(l=>{
+    if(tf && l.type!==tf) return;
+    if(af && l.action!==af) return;
+    if(uf && !(l.user||"").toLowerCase().includes(uf)) return;
+    if(sf && !JSON.stringify(l.details).toLowerCase().includes(sf)) return;
+    if(sd && l.timestamp<sd) return;
+    if(ed && l.timestamp>ed) return;
+
+    shown++;
+    const d=new Date(l.timestamp);
+    const target = (l.type === "personnel") 
+                 ? l.details.adSoyad || l.details.tc || "-" 
+                 : (l.type === "transfer")
+                     ? `${l.details.personName} • ${l.details.oldProjectName} → ${l.details.newProjectName}`
+                     : l.details.projectName || "-";
+    const card=document.createElement("div");
+    card.className="log-card";
+    card.innerHTML=`
+      <div class="log-head">
+        <span class="badge ${l.type==="projects"?"proje":l.type==="personnel"?"personel":"transfer"}">
+          ${l.type==="projects"?"PROJE":l.type==="personnel"?"PERSONEL":"TRANSFER"}
+        </span>
+        <span class="action ${l.action}">${actionTR(l.action)}</span>
+      </div>
+      <div class="meta">${d.toLocaleString()} • ${l.user||"?"}</div>
+      <div class="target">${target}</div>
+      <div class="toggle">Detayı Göster</div>
+      <div class="details">${JSON.stringify(l.details,null,2)}
+      ${l.details.lat?`\n\nHarita: https://www.google.com/maps?q=${l.details.lat},${l.details.lng}`:""}</div>
+    `;
+
+    const toggle=card.querySelector(".toggle");
+    const det=card.querySelector(".details");
+    toggle.onclick=()=>{
+      det.style.display=det.style.display==="block"?"none":"block";
+      toggle.textContent=det.style.display==="block"?"Detayı Gizle":"Detayı Göster";
+    };
+
+    container.appendChild(card);
+  });
+
+  if(!shown) container.innerHTML='<div class="empty">Filtreye uygun kayıt yok</div>';
+}
+
+function actionTR(a){
+  return {
+    create:"Proje Oluşturuldu",
+    add:"Personel Eklendi",
+    update:"Güncellendi",
+    "update-location":"Konum Güncellendi",
+    delete:"Proje Silindi",
+    remove:"Personel Silindi",
+    transfer:"Personel Transfer Edildi"
+  }[a]||a;
+}
+
+[typeFilter,actionFilter,userFilter,searchFilter,startDate,endDate]
+.forEach(e=>e.addEventListener("input",render));
+</script>
+</body>
+</html>
