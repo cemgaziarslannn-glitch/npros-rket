@@ -1,5 +1,5 @@
 {
-  "name": "CGA Denetleme Sistemi",
+  "name": "Yetkili Sistemi",
   "short_name": "Yetkili Sistemi",
   "description": "QR kodlu güvenlik denetleme ve raporlama sistemi",
   "start_url": "index.html",
@@ -38,4 +38,5 @@
     }
   ]
 }
+
 
