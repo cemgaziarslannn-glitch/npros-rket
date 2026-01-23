@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Denetleme Sistemi | Giriş</title>
+<title>Yetkili Sistemi | Giriş</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -12,7 +12,24 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!-- ===== PWA / ANDROID + IOS ===== -->
+<link rel="manifest" href="./manifest.json">
 
+<!-- Android -->
+<meta name="theme-color" content="#1e3a8a">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Denetleme Sistemi">
+
+<!-- iOS Icons -->
+<link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+<link rel="apple-touch-icon" sizes="152x152" href="./icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="./icon-120.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
+<!-- ===== PWA BİTİŞ ===== -->
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;overscroll-behavior:none;}
@@ -140,6 +157,40 @@ button:hover{
   opacity:.7;
   pointer-events:none;
 }
+/* PWA INSTALL BUTTON - Sabit ve ekranın sağ üst köşesi */
+.install-btn{
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  padding: 12px 18px;
+  border-radius: 50px;
+  background: linear-gradient(135deg,#38bdf8,#6366f1);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  z-index: 999;
+  display: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+
+/* Hover efekti */
+.install-btn:hover{
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+  background: linear-gradient(135deg,#22d3ee,#4f46e5);
+}
+
+/* Küçük ekranlarda uyumlu */
+@media(max-width: 400px){
+  .install-btn{
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
 </style>
 </head>
 
@@ -255,6 +306,27 @@ function resetPassword(){
   firebase.auth().sendPasswordResetEmail(mail)
     .then(()=> show("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.","success"))
     .catch(()=> show("Bu e-posta bulunamadı"));
+}
+/* ANDROID için PWA install yakala */
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "block";
+});
+
+/* Butona basılınca */
+installBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+});
+
+/* iOS ise butonu gizle */
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+if(isIOS){
+  installBtn.style.display = "none";
 }
 </script>
 
